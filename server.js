@@ -63,7 +63,15 @@ app.get('/qr', async (req, res) => {
   const logoutBtn = `<form method="POST" action="/logout" style="margin-top:20px"><button type="submit" style="background:#ef4444;color:white;border:none;padding:10px 24px;border-radius:12px;font-size:14px;cursor:pointer">🔌 Putuskan WhatsApp</button></form>`;
 
   if (isConnected) return res.send(`<html><body style="text-align:center;font-family:sans-serif;padding:40px"><h2 style="color:green">✅ WhatsApp sudah terkoneksi!</h2>${logoutBtn}</body></html>`);
-  if (!currentQR) return res.send('<h2 style="font-family:sans-serif">⏳ Menunggu QR... Refresh halaman ini.</h2><script>setTimeout(()=>location.reload(),3000)</script>');
+  if (!currentQR) return res.send(`
+    <html><body style="text-align:center;font-family:sans-serif;padding:40px">
+      <h2>⏳ Memuat QR...</h2>
+      <div style="width:40px;height:40px;border:4px solid #16a34a;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto"></div>
+      <p style="color:gray;font-size:13px">Halaman otomatis refresh setiap 2 detik</p>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      <script>setTimeout(()=>location.reload(), 2000)</script>
+    </body></html>
+  `);
   const qrImage = await QRCode.toDataURL(currentQR);
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif;padding:40px">
