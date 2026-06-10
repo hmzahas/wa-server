@@ -1,6 +1,8 @@
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const express = require('express');
 const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -107,6 +109,17 @@ app.post('/logout', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err?.message });
   }
+});
+
+app.get('/reset', async (req, res) => {
+  try {
+    await client.destroy();
+  } catch {}
+  try {
+    fs.rmSync(path.join(__dirname, 'auth'), { recursive: true, force: true });
+  } catch {}
+  res.send('<h2>Session dihapus. <a href="/qr">Klik di sini untuk scan QR baru</a></h2>');
+  setTimeout(() => process.exit(0), 1000);
 });
 
 app.listen(PORT, () => {
