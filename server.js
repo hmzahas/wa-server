@@ -46,7 +46,16 @@ client.on('disconnected', () => {
   client.initialize();
 });
 
+// Auto reset session jika 30 detik tidak ada QR dan tidak connected
 client.initialize();
+setTimeout(async () => {
+  if (!isConnected && !currentQR) {
+    console.log('Timeout: hapus session corrupt dan restart...');
+    try { await client.destroy(); } catch {}
+    try { fs.rmSync(path.join(__dirname, 'auth'), { recursive: true, force: true }); } catch {}
+    setTimeout(() => process.exit(0), 500);
+  }
+}, 30000);
 
 app.get('/', (_, res) => res.json({ status: 'WA Server running', connected: isConnected }));
 
