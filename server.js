@@ -60,7 +60,9 @@ setTimeout(async () => {
 app.get('/', (_, res) => res.json({ status: 'WA Server running', connected: isConnected }));
 
 app.get('/qr', async (req, res) => {
-  if (isConnected) return res.send('<h2 style="color:green;font-family:sans-serif">✅ WhatsApp sudah terkoneksi!</h2>');
+  const logoutBtn = `<form method="POST" action="/logout" style="margin-top:20px"><button type="submit" style="background:#ef4444;color:white;border:none;padding:10px 24px;border-radius:12px;font-size:14px;cursor:pointer">🔌 Putuskan WhatsApp</button></form>`;
+
+  if (isConnected) return res.send(`<html><body style="text-align:center;font-family:sans-serif;padding:40px"><h2 style="color:green">✅ WhatsApp sudah terkoneksi!</h2>${logoutBtn}</body></html>`);
   if (!currentQR) return res.send('<h2 style="font-family:sans-serif">⏳ Menunggu QR... Refresh halaman ini.</h2><script>setTimeout(()=>location.reload(),3000)</script>');
   const qrImage = await QRCode.toDataURL(currentQR);
   res.send(`
@@ -110,14 +112,12 @@ app.get('/logout', async (req, res) => {
 });
 
 app.post('/logout', async (req, res) => {
-  if (req.headers['x-auth-secret'] !== AUTH_SECRET)
-    return res.status(401).json({ error: 'Unauthorized' });
   try {
     await client.logout();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err?.message });
-  }
+  } catch {}
+  isConnected = false;
+  currentQR = null;
+  res.redirect('/qr');
 });
 
 app.get('/reset', async (req, res) => {
