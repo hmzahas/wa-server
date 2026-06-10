@@ -67,7 +67,7 @@ app.get('/qr', async (req, res) => {
     <html><body style="text-align:center;font-family:sans-serif;padding:40px">
       <h2>⏳ Memuat QR...</h2>
       <div style="width:40px;height:40px;border:4px solid #16a34a;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto"></div>
-      <p style="color:gray;font-size:13px">Halaman otomatis refresh setiap 2 detik</p>
+      <p style="color:gray;font-size:13px">Mohon tunggu.. sedang membuat QR baru</p>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
       <script>setTimeout(()=>location.reload(), 2000)</script>
     </body></html>
