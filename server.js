@@ -89,6 +89,17 @@ app.post('/send', async (req, res) => {
   }
 });
 
+app.post('/logout', async (req, res) => {
+  if (req.headers['x-auth-secret'] !== AUTH_SECRET)
+    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    await client.logout();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err?.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`WA Server jalan di port ${PORT}`);
   console.log(`Buka /qr untuk scan QR`);
