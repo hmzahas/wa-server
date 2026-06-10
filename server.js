@@ -89,6 +89,15 @@ app.post('/send', async (req, res) => {
   }
 });
 
+app.get('/logout', async (req, res) => {
+  try {
+    await client.logout();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err?.message });
+  }
+});
+
 app.post('/logout', async (req, res) => {
   if (req.headers['x-auth-secret'] !== AUTH_SECRET)
     return res.status(401).json({ error: 'Unauthorized' });
