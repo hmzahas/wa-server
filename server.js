@@ -69,12 +69,6 @@ function createClient() {
     currentQR = qr;
     isConnected = false;
     console.log('QR baru tersedia, buka /qr untuk scan');
-
-    clearQRTimeout();
-    qrTimeout = setTimeout(async () => {
-      console.log('QR tidak di-scan 60 detik, buat session baru...');
-      await startFresh();
-    }, 60000);
   });
 
   client.on('ready', () => {
@@ -84,35 +78,15 @@ function createClient() {
     console.log('✅ WhatsApp Connected!');
   });
 
-  client.on('auth_failure', async () => {
-    console.log('Auth gagal, buat session baru...');
-    await startFresh();
-  });
+  client.on('auth_failure', () => console.log('Auth gagal.'));
 
-  client.on('disconnected', async reason => {
-    console.log('Disconnected:', reason, '→ mencoba reconnect...');
-    // Hanya hapus session jika memang logout/banned, bukan sekadar koneksi putus
-    if (reason === 'LOGOUT') {
-      await startFresh();
-    } else {
-      await restartClient();
-    }
+  client.on('disconnected', reason => {
+    console.log('Disconnected:', reason);
+    isConnected = false;
   });
 
   client.initialize();
 }
-
-// Health check setiap 60 detik
-setInterval(async () => {
-  if (!isConnected || !client) return;
-  try {
-    const state = await client.getState();
-    if (!state) throw new Error('no state');
-  } catch {
-    console.log('Health check gagal, restart client...');
-    await restartClient(); // restart tanpa hapus session
-  }
-}, 60000);
 
 // Start pertama kali
 createClient();
@@ -171,10 +145,7 @@ app.post('/send', async (req, res) => {
   } catch (err) {
     const errMsg = err?.message || JSON.stringify(err);
     console.error('SEND ERROR:', errMsg);
-    if (errMsg.includes('Target closed') || errMsg.includes('Session closed') || errMsg.includes('detached Frame')) {
-      isConnected = false;
-      setTimeout(() => restartClient(), 1000);
-    }
+    isConnected = false;
     res.status(500).json({ error: errMsg });
   }
 });
