@@ -35,6 +35,14 @@ async function startFresh() {
 }
 
 function createClient() {
+  // Hapus Chromium lock file agar tidak crash saat restart
+  const lockFiles = [
+    path.join(AUTH_PATH, 'session', 'Default', 'lockfile'),
+    path.join(AUTH_PATH, 'session', 'SingletonLock'),
+    path.join(AUTH_PATH, 'session', 'SingletonCookie'),
+    path.join(AUTH_PATH, 'session', 'SingletonSocket'),
+  ];
+  lockFiles.forEach(f => { try { fs.rmSync(f, { force: true }); } catch {} });
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './auth' }),
     restartOnAuthFail: true,
