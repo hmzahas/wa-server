@@ -14,12 +14,7 @@ const AUTH_PATH = path.join(__dirname, 'auth');
 
 let currentQR = null;
 let isConnected = false;
-let qrTimeout = null;
 let client = null;
-
-function clearQRTimeout() {
-  if (qrTimeout) { clearTimeout(qrTimeout); qrTimeout = null; }
-}
 
 function deleteSession() {
   try { fs.rmSync(AUTH_PATH, { recursive: true, force: true }); } catch {}
@@ -31,16 +26,7 @@ async function destroyClient() {
   client = null;
 }
 
-async function restartClient() {
-  clearQRTimeout();
-  isConnected = false;
-  currentQR = null;
-  await destroyClient();
-  setTimeout(() => createClient(), 3000);
-}
-
 async function startFresh() {
-  clearQRTimeout();
   isConnected = false;
   currentQR = null;
   await destroyClient();
@@ -74,7 +60,6 @@ function createClient() {
   client.on('ready', () => {
     isConnected = true;
     currentQR = null;
-    clearQRTimeout();
     console.log('✅ WhatsApp Connected!');
   });
 
@@ -83,6 +68,7 @@ function createClient() {
   client.on('disconnected', reason => {
     console.log('Disconnected:', reason);
     isConnected = false;
+    currentQR = null;
   });
 
   client.initialize();
