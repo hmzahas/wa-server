@@ -173,7 +173,7 @@ app.post('/send', async (req, res) => {
     console.error('SEND ERROR:', errMsg);
     if (errMsg.includes('Target closed') || errMsg.includes('Session closed') || errMsg.includes('detached Frame')) {
       isConnected = false;
-      setTimeout(() => startFresh(), 1000);
+      setTimeout(() => restartClient(), 1000);
     }
     res.status(500).json({ error: errMsg });
   }
