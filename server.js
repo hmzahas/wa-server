@@ -31,6 +31,14 @@ async function destroyClient() {
   client = null;
 }
 
+async function restartClient() {
+  clearQRTimeout();
+  isConnected = false;
+  currentQR = null;
+  await destroyClient();
+  setTimeout(() => createClient(), 3000);
+}
+
 async function startFresh() {
   clearQRTimeout();
   isConnected = false;
@@ -82,14 +90,19 @@ function createClient() {
   });
 
   client.on('disconnected', async reason => {
-    console.log('Disconnected:', reason, '→ buat session baru...');
-    await startFresh();
+    console.log('Disconnected:', reason, '→ mencoba reconnect...');
+    // Hanya hapus session jika memang logout/banned, bukan sekadar koneksi putus
+    if (reason === 'LOGOUT') {
+      await startFresh();
+    } else {
+      await restartClient();
+    }
   });
 
   client.initialize();
 }
 
-// Health check setiap 30 detik
+// Health check setiap 60 detik
 setInterval(async () => {
   if (!isConnected || !client) return;
   try {
@@ -97,9 +110,9 @@ setInterval(async () => {
     if (!state) throw new Error('no state');
   } catch {
     console.log('Health check gagal, restart client...');
-    await startFresh();
+    await restartClient(); // restart tanpa hapus session
   }
-}, 30000);
+}, 60000);
 
 // Start pertama kali
 createClient();
