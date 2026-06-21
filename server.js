@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const express = require('express');
 const QRCode = require('qrcode');
@@ -8,70 +9,108 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 
 const PORT = process.env.PORT || 3001;
-const AUTH_SECRET = process.env.AUTH_SECRET || 'secret123';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'gatesend_secret_2024';
+const AUTH_PATH = path.join(__dirname, 'auth');
 
 let currentQR = null;
 let isConnected = false;
+let qrTimeout = null;
+let client = null;
 
-const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: './auth' }),
-  puppeteer: {
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-    ]
-  }
-});
+function clearQRTimeout() {
+  if (qrTimeout) { clearTimeout(qrTimeout); qrTimeout = null; }
+}
 
-client.on('qr', async qr => {
-  currentQR = qr;
+function deleteSession() {
+  try { fs.rmSync(AUTH_PATH, { recursive: true, force: true }); } catch {}
+}
+
+async function destroyClient() {
+  if (!client) return;
+  try { client.removeAllListeners(); await client.destroy(); } catch {}
+  client = null;
+}
+
+async function startFresh() {
+  clearQRTimeout();
   isConnected = false;
-  console.log('QR baru tersedia, buka /qr untuk scan');
-});
-
-client.on('ready', () => {
-  isConnected = true;
   currentQR = null;
-  console.log('✅ WhatsApp Connected!');
-});
+  await destroyClient();
+  deleteSession();
+  setTimeout(() => createClient(), 2000);
+}
 
-client.on('disconnected', () => {
-  isConnected = false;
-  console.log('Disconnected, mencoba reconnect...');
+function createClient() {
+  client = new Client({
+    authStrategy: new LocalAuth({ dataPath: './auth' }),
+    restartOnAuthFail: true,
+    puppeteer: {
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+        '--disable-gpu', '--no-first-run', '--disable-extensions',
+        '--disable-background-networking', '--disable-default-apps',
+        '--disable-sync', '--disable-translate', '--mute-audio',
+      ]
+    }
+  });
+
+  client.on('qr', qr => {
+    currentQR = qr;
+    isConnected = false;
+    console.log('QR baru tersedia, buka /qr untuk scan');
+
+    clearQRTimeout();
+    qrTimeout = setTimeout(async () => {
+      console.log('QR tidak di-scan 60 detik, buat session baru...');
+      await startFresh();
+    }, 60000);
+  });
+
+  client.on('ready', () => {
+    isConnected = true;
+    currentQR = null;
+    clearQRTimeout();
+    console.log('✅ WhatsApp Connected!');
+  });
+
+  client.on('auth_failure', async () => {
+    console.log('Auth gagal, buat session baru...');
+    await startFresh();
+  });
+
+  client.on('disconnected', async reason => {
+    console.log('Disconnected:', reason, '→ buat session baru...');
+    await startFresh();
+  });
+
   client.initialize();
-});
+}
 
-// Auto reset session jika 30 detik tidak ada QR dan tidak connected
-client.initialize();
-setTimeout(async () => {
-  if (!isConnected && !currentQR) {
-    console.log('Timeout: hapus session corrupt dan restart...');
-    try { await client.destroy(); } catch {}
-    try { fs.rmSync(path.join(__dirname, 'auth'), { recursive: true, force: true }); } catch {}
-    setTimeout(() => process.exit(0), 500);
-  }
-}, 30000);
+// Start pertama kali
+createClient();
 
 app.get('/', (_, res) => res.json({ status: 'WA Server running', connected: isConnected }));
 
-app.get('/qr', async (req, res) => {
-  const logoutBtn = `<form method="POST" action="/logout" style="margin-top:20px"><button type="submit" style="background:#ef4444;color:white;border:none;padding:10px 24px;border-radius:12px;font-size:14px;cursor:pointer">🔌 Putuskan WhatsApp</button></form>`;
+app.get('/status', (_, res) => res.json({ connected: isConnected }));
 
-  if (isConnected) return res.send(`<html><body style="text-align:center;font-family:sans-serif;padding:40px"><h2 style="color:green">✅ WhatsApp sudah terkoneksi!</h2>${logoutBtn}</body></html>`);
+app.get('/qr', async (req, res) => {
+  const resetBtn = `<form method="POST" action="/reset" style="margin-top:12px"><button type="submit" style="background:#f97316;color:white;border:none;padding:8px 20px;border-radius:10px;font-size:13px;cursor:pointer">🔄 Reset Session</button></form>`;
+  const logoutBtn = `<form method="POST" action="/logout" style="margin-top:8px"><button type="submit" style="background:#ef4444;color:white;border:none;padding:8px 20px;border-radius:10px;font-size:13px;cursor:pointer">🔌 Putuskan WhatsApp</button></form>`;
+
+  if (isConnected) return res.send(`<html><body style="text-align:center;font-family:sans-serif;padding:40px"><h2 style="color:green">✅ WhatsApp sudah terkoneksi!</h2>${logoutBtn}${resetBtn}</body></html>`);
+
   if (!currentQR) return res.send(`
     <html><body style="text-align:center;font-family:sans-serif;padding:40px">
       <h2>⏳ Memuat QR...</h2>
       <div style="width:40px;height:40px;border:4px solid #16a34a;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:20px auto"></div>
       <p style="color:gray;font-size:13px">Mohon tunggu.. sedang membuat QR baru</p>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-      <script>setTimeout(()=>location.reload(), 2000)</script>
+      ${resetBtn}
+      <script>setTimeout(()=>location.reload(), 3000)</script>
     </body></html>
   `);
+
   const qrImage = await QRCode.toDataURL(currentQR);
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif;padding:40px">
@@ -79,12 +118,11 @@ app.get('/qr', async (req, res) => {
       <p>WhatsApp → titik tiga → <b>Linked Devices</b> → <b>Link a Device</b></p>
       <img src="${qrImage}" style="width:300px;height:300px"/>
       <p style="color:gray;font-size:12px">QR expired dalam 60 detik. Halaman auto-refresh.</p>
-      <script>setTimeout(()=>location.reload(), 30000)</script>
+      ${resetBtn}
+      <script>setTimeout(()=>location.reload(), 20000)</script>
     </body></html>
   `);
 });
-
-app.get('/status', (_, res) => res.json({ connected: isConnected }));
 
 app.post('/send', async (req, res) => {
   if (req.headers['x-auth-secret'] !== AUTH_SECRET)
@@ -110,33 +148,15 @@ app.post('/send', async (req, res) => {
   }
 });
 
-app.get('/logout', async (req, res) => {
-  try {
-    await client.logout();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err?.message });
-  }
-});
-
 app.post('/logout', async (req, res) => {
-  try {
-    await client.logout();
-  } catch {}
-  isConnected = false;
-  currentQR = null;
+  try { await client.logout(); } catch {}
+  await startFresh();
   res.redirect('/qr');
 });
 
-app.get('/reset', async (req, res) => {
-  try {
-    await client.destroy();
-  } catch {}
-  try {
-    fs.rmSync(path.join(__dirname, 'auth'), { recursive: true, force: true });
-  } catch {}
-  res.send('<h2>Session dihapus. <a href="/qr">Klik di sini untuk scan QR baru</a></h2>');
-  setTimeout(() => process.exit(0), 1000);
+app.post('/reset', async (req, res) => {
+  await startFresh();
+  res.redirect('/qr');
 });
 
 app.listen(PORT, () => {
