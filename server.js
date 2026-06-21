@@ -89,6 +89,18 @@ function createClient() {
   client.initialize();
 }
 
+// Health check setiap 30 detik
+setInterval(async () => {
+  if (!isConnected || !client) return;
+  try {
+    const state = await client.getState();
+    if (!state) throw new Error('no state');
+  } catch {
+    console.log('Health check gagal, restart client...');
+    await startFresh();
+  }
+}, 30000);
+
 // Start pertama kali
 createClient();
 
@@ -146,7 +158,7 @@ app.post('/send', async (req, res) => {
   } catch (err) {
     const errMsg = err?.message || JSON.stringify(err);
     console.error('SEND ERROR:', errMsg);
-    if (errMsg.includes('Target closed') || errMsg.includes('Session closed')) {
+    if (errMsg.includes('Target closed') || errMsg.includes('Session closed') || errMsg.includes('detached Frame')) {
       isConnected = false;
       setTimeout(() => startFresh(), 1000);
     }
