@@ -51,6 +51,8 @@ function createClient() {
         '--disable-gpu', '--no-first-run', '--disable-extensions',
         '--disable-background-networking', '--disable-default-apps',
         '--disable-sync', '--disable-translate', '--mute-audio',
+        '--single-process', '--no-zygote', '--disable-accelerated-2d-canvas',
+        '--disable-web-security', '--memory-pressure-off',
       ]
     }
   });
@@ -144,6 +146,10 @@ app.post('/send', async (req, res) => {
   } catch (err) {
     const errMsg = err?.message || JSON.stringify(err);
     console.error('SEND ERROR:', errMsg);
+    if (errMsg.includes('Target closed') || errMsg.includes('Session closed')) {
+      isConnected = false;
+      setTimeout(() => startFresh(), 1000);
+    }
     res.status(500).json({ error: errMsg });
   }
 });
