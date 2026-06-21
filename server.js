@@ -73,10 +73,13 @@ function createClient() {
 
   client.on('auth_failure', () => console.log('Auth gagal.'));
 
-  client.on('disconnected', reason => {
+  client.on('disconnected', async reason => {
     console.log('Disconnected:', reason);
     isConnected = false;
     currentQR = null;
+    await destroyClient();
+    if (reason === 'LOGOUT') deleteSession();
+    setTimeout(() => createClient(), 3000);
   });
 
   client.initialize();
@@ -139,7 +142,12 @@ app.post('/send', async (req, res) => {
   } catch (err) {
     const errMsg = err?.message || JSON.stringify(err);
     console.error('SEND ERROR:', errMsg);
-    isConnected = false;
+    if (errMsg.includes('detached Frame') || errMsg.includes('Target closed') || errMsg.includes('Session closed')) {
+      isConnected = false;
+      currentQR = null;
+      await destroyClient();
+      setTimeout(() => createClient(), 3000);
+    }
     res.status(500).json({ error: errMsg });
   }
 });
